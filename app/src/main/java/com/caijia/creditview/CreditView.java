@@ -18,15 +18,12 @@ import android.util.AttributeSet;
 import android.util.TypedValue;
 import android.view.View;
 
+import com.gp.gj.R;
+
 /**
  * Created by cai.jia on 2015/11/6.
  */
 public class CreditView extends View {
-
-    /**
-     * 控件默认的大小
-     */
-    private static final int DEFAULT_SIZE_DIP = 300;
 
     /**
      * 控件的半径
@@ -67,13 +64,16 @@ public class CreditView extends View {
     private void init() {
         mDensity = getResources().getDisplayMetrics().density;
         mIndicatorIcon = BitmapFactory.decodeResource(getResources(), R.mipmap.ic_credit_icon);
+        mBitmapMat.postScale(mDensity / 2, mDensity / 2, 0.5f, 0.5f);
     }
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-        int size = (int) dpConvertPx(DEFAULT_SIZE_DIP);
-        setMeasuredDimension(resolveSize(size, widthMeasureSpec), resolveSize(size, heightMeasureSpec));
+        int width = MeasureSpec.getSize(widthMeasureSpec);
+        int height = MeasureSpec.getSize(heightMeasureSpec);
+        int size = Math.min(width, height);
+        setMeasuredDimension(resolveSize(size,widthMeasureSpec),resolveSize(size,heightMeasureSpec));
     }
 
     private RectF mOutBounds = new RectF();
@@ -99,7 +99,7 @@ public class CreditView extends View {
     }
 
     public void start() {
-        handler.postDelayed(runnable, 50);
+        handler.postDelayed(runnable, 500);
     }
 
     Handler handler = new Handler();
@@ -109,8 +109,9 @@ public class CreditView extends View {
         public void run() {
             if (mProgress < mValue) {
                 ++mProgress;
-                invalidate();
-                handler.postDelayed(this, 50);
+                invalidate((int) mInBounds.left, (int) mInBounds.top,
+                        (int) mInBounds.right, (int) mInBounds.bottom);
+                handler.postDelayed(this, 24);
             }
         }
     };
@@ -125,6 +126,8 @@ public class CreditView extends View {
     private Paint mPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     private Matrix matrix;
+
+    private Matrix mBitmapMat = new Matrix();
 
     private Rect mTextBounds = new Rect();
 
@@ -142,8 +145,9 @@ public class CreditView extends View {
         float degree = 360 - startAngle;
         double cos = Math.cos(Math.toRadians(degree));
         double sin = Math.sin(Math.toRadians(degree));
-        float startPx = (float) (mRadius + mRadius * cos);
-        float startPy = (float) (mRadius - mRadius * sin);
+        float radius = out.width() / 2;
+        float startPx = (float) (mRadius + radius * cos) + mOffsetX;
+        float startPy = (float) (mRadius - radius * sin) + mOffsetY;
 
         path.setFillType(Path.FillType.EVEN_ODD);
         path.moveTo(startPx, startPy);
@@ -153,17 +157,25 @@ public class CreditView extends View {
         return path;
     }
 
+    private int mOffsetX;
+
+    private int mOffsetY;
+
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
         int width = getWidth();
         int height = getHeight();
 
-        mRadius = width / 2;
-        mOutBounds.set(0, 0, width, height);
-
         int cx = width / 2;
         int cy = height / 2;
+
+        mRadius = Math.min(width - getPaddingLeft() - getPaddingRight(),
+                height - getPaddingTop() - getPaddingBottom()) / 2;
+        mOutBounds.set(cx - mRadius, cy - mRadius, cx + mRadius, cy + mRadius);
+
+        mOffsetX = cx - mRadius;
+        mOffsetY = cy - mRadius;
 
         mInBounds.set(mOutBounds);
         mInBounds.inset(dpConvertPx(20), dpConvertPx(20));
@@ -171,8 +183,6 @@ public class CreditView extends View {
 
         //画一个最外边带渐变的弧线
         if (mSweepGradient == null) {
-//            mSweepGradient = new SweepGradient(cx, cy,
-//                    new int[]{Color.RED,Color.GREEN,Color.BLUE,Color.GRAY}, null);
             mSweepGradient = new SweepGradient(cx, cy,
                     new int[]{0xffFF4A38, 0xffFE9901, 0xffCDD412,
                             0xff5cd412, 0xff0CDC8D, 0xff0CDC8D, 0xff0CDC8D}, null);
@@ -180,7 +190,7 @@ public class CreditView extends View {
 
         if (matrix == null) {
             matrix = new Matrix();
-            matrix.postRotate(mStartAngle,cx,cy);
+            matrix.postRotate(mStartAngle, cx, cy);
             mSweepGradient.setLocalMatrix(matrix);
         }
         mPaint.setShader(mSweepGradient);
@@ -221,27 +231,26 @@ public class CreditView extends View {
         double sin = Math.sin(Math.toRadians(360 - startAngle - sweepAngle));
 
         float radius = mIndInBounds.height() / 2;
-        float startPx = (float) (mRadius + radius * cos);
-        float startPy = (float) (mRadius - radius * sin);
+        float startPx = (float) (mRadius + radius * cos) + mOffsetX;
+        float startPy = (float) (mRadius - radius * sin) + mOffsetY;
         int saveCount = canvas.save();
         canvas.translate(startPx, startPy);
         canvas.rotate(-degree);
-        Matrix matrix = new Matrix();
-        matrix.postTranslate(-mIndicatorIcon.getWidth() / 2, -mIndicatorIcon.getHeight() / 2 - 4 * mDensity);
-        matrix.postScale(mDensity / 2, mDensity / 2, 0.5f, 0.5f);
-        canvas.drawBitmap(mIndicatorIcon, matrix, mIndicatorP);
+        mBitmapMat.reset();
+        mBitmapMat.postTranslate(-mIndicatorIcon.getWidth() / 2, -mIndicatorIcon.getHeight() / 2 - 4 * mDensity);
+        canvas.drawBitmap(mIndicatorIcon, mBitmapMat, mIndicatorP);
         canvas.restoreToCount(saveCount);
     }
 
     private void drawArcText(Canvas canvas, int value) {
         mCenterTextP.setColor(0xff2C8DF8);
-        mCenterTextP.setTextSize(spConvertPx(40));
+        mCenterTextP.setTextSize(spConvertPx(36));
 
         //画中间的字
         String cText = String.valueOf(value);
         mCenterTextP.getTextBounds(cText, 0, cText.length(), mTextBounds);
         canvas.drawText(cText, (getWidth() - mTextBounds.width()) / 2,
-                getHeight() / 2 + mTextBounds.height() / 3, mCenterTextP);
+                getHeight() / 2 + mTextBounds.height() / 6, mCenterTextP);
 
         String creditText;
         if (value >= 80) {
@@ -252,51 +261,53 @@ public class CreditView extends View {
             creditText = "信用较差";
         }
 
-        mCenterTextP.setTextSize(spConvertPx(26));
+        mCenterTextP.setTextSize(spConvertPx(18));
         mCenterTextP.getTextBounds(creditText, 0, creditText.length(), mTextBounds);
         canvas.drawText(creditText, (getWidth() - mTextBounds.width()) / 2,
-                getHeight() - mTextBounds.height() / 2, mCenterTextP);
+                mInBounds.height() - mTextBounds.height(), mCenterTextP);
     }
 
     /**
      * 画圆弧上的刻度
      */
     private void drawArcLine(Canvas canvas) {
-        RectF innerBounds = new RectF(mOutBounds);
-        innerBounds.inset(dpConvertPx(20), dpConvertPx(20));
-
         mLinePaint.setColor(Color.WHITE);
-
         mTextPaint.setColor(Color.BLACK);
         mTextPaint.setTextSize(spConvertPx(14));
 
         //一个刻度有几度
         int times = 2;
-        float perAngle = mTotalAngle / mTotal * times;
-        int length = mTotal / times;
+        float perLineAngle = mTotalAngle / mTotal * times;
+        int lineCount = mTotal / times;
 
-        for (int i = 0; i <= length; i++) {
+        for (int i = 0; i <= lineCount; i++) {
             boolean big = i % 10 == 0;
+            boolean isStart = i == 0;
+            boolean isEnd = i == lineCount;
+
             mLinePaint.setStrokeWidth(big ? 3 : 1);
 
-            float sweepAngle = perAngle * i;
+            float sweepAngle = perLineAngle * i;
             float degree = 270 - mStartAngle - sweepAngle;
             double cos = Math.cos(Math.toRadians(360 - mStartAngle - sweepAngle));
             double sin = Math.sin(Math.toRadians(360 - mStartAngle - sweepAngle));
 
-            float radius = innerBounds.height() / 2;
+            float radius = mInBounds.height() / 2;
 
-            float ox = (float) (mRadius * (1 + cos));
-            float oy = (float) (mRadius * (1 - sin));
+            float ox = (float) (mRadius * (1 + cos)) + mOffsetX;
+            float oy = (float) (mRadius * (1 - sin)) + mOffsetY;
 
-            float ix = (float) (mRadius + cos * radius);
-            float iy = (float) (mRadius - sin * radius);
+            float ix = (float) (mRadius + cos * radius) + mOffsetX;
+            float iy = (float) (mRadius - sin * radius) + mOffsetY;
 
-            canvas.drawLine(ox, oy, ix, iy, mLinePaint);
+            if (!(isStart || isEnd)) {
+                canvas.drawLine(ox, oy, ix, iy, mLinePaint);
+            }
             if (big) {
                 //画大刻度的文字
                 String text = String.valueOf(i * 2);
                 mTextPaint.getTextBounds(text, 0, text.length(), mTextBounds);
+                mTextBounds.inset((int) -dpConvertPx(2), (int) -dpConvertPx(2));
                 int textWidth = mTextBounds.width();
                 int textHeight = mTextBounds.height();
 
@@ -304,9 +315,6 @@ public class CreditView extends View {
                 canvas.translate(ix, iy);
                 canvas.rotate(-degree);
 
-                //是否是在开始位置或者结束位置
-                boolean isStart = i == 0;
-                boolean isEnd = i == length;
                 if (isStart) {
                     canvas.drawText(text, 0, textHeight, mTextPaint);
                 } else if (isEnd) {

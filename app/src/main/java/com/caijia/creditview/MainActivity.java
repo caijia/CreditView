@@ -16,10 +16,4 @@ public class MainActivity extends AppCompatActivity {
         mCreditView.setProgress(90);
         mCreditView.start();
     }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        mCreditView.start();
-    }
 }
